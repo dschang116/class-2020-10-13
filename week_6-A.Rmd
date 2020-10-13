@@ -39,8 +39,14 @@ We are learning about sampling this week. We are taking the theory of Chapter 5 
 # sample will work on a vector.
 # sample_n will work on a tibble.
 
-random_samples <- tibble(replicate = 1:5,
-       samp = map(replicate, ~ sample_n(urn, size = 30)))
+# First, make an empty tibble with 5 "slots" for samples
+tibble(replicate = 1:5) %>% 
+  
+  # Make a list-column and take a sample of size 30 from urn with each of those.
+  # replace = TRUE means we will put back each bead as we sample it, instead of 
+  # storing the ones we've already sampled aside.
+  
+  mutate(samp = map(replicate, ~ sample_n(urn, 30, replace = TRUE)))
 ```
 
 
@@ -50,19 +56,22 @@ random_samples <- tibble(replicate = 1:5,
 
 ```{r}
 
-scene2 <- function(size = 50){
-  sample_n(urn, size = size, replace = TRUE) %>%
-    summarize(is_red = (color == "red"),
-              is_blue = (color == "blue")) %>%
-    summarize(num_red = sum(is_red),
-              num_blue = sum(is_blue)) %>%
-    summarize(more_red = (num_red > num_blue))
-}
-
-prob_red_wins <- tibble(replicate = 1:1000,
-                        samp = map(replicate, ~ scene2(size = 50))) %>%
-  unnest(samp) %>%
-  summarize(prob = mean(more_red))
+tibble(replicate = 1:1000) %>% 
+  
+  # Very similar to the code above! Just changing some constants.
+  
+  mutate(samp = map(replicate, ~ sample_n(urn, 50, replace = TRUE))) %>% 
+  
+  # We now use the list-column we created, samp, to make integer values.
+  # That's why we use map_int and not map.
+  
+  mutate(numb_red = map_int(samp, ~ sum(.$color == "red"))) %>% 
+  mutate(numb_blue = map_int(samp, ~ sum(.$color == "blue"))) %>% 
+  
+  # Now we can simply compare two integer values
+  
+  mutate(red_wins = ifelse(numb_red > numb_blue, TRUE, FALSE)) %>% 
+  summarize(prob = sum(red_wins)/n())
 ```
 
 
@@ -76,6 +85,21 @@ Hint: Review the use of `rbinom()`, especially the `n`, `size` and `prob` argume
 
 ```{r}
 
+# Using `rbinom()` calculate the number of red beads we might draw from the urn with a paddle of size 25. Hint: `n` is 1 in this case. What does it mean if we set `n` equal to 10?
+rbinom(n = 1, size = 25, prob = 400/1000)
+# This works for one row.
+tibble(numb_red_urn = 400) %>% 
+  mutate(numb_red_paddle = rbinom(n = 1, size = 25, prob = numb_red_urn/1000))
+# But not for multiple rows! 
+tibble(numb_red_urn = seq(100, 700, by = 100)) %>% 
+  mutate(numb_red_paddle = rbinom(n = 1, size = 25, prob = numb_red_urn/1000))
+# For that, you need map.
+tibble(numb_red_urn = seq(100, 700, by = 100)) %>% 
+  mutate(numb_red_paddle = map_int(numb_red_urn, ~ rbinom(n = 1, size = 25, prob = ./1000)))
+# More experiments and unnesting for convenience. 
+tibble(numb_red_urn = seq(100, 700, by = 100)) %>% 
+  mutate(numb_red_paddle = map(numb_red_urn, ~ rbinom(n = 10, size = 25, prob = ./1000))) %>% 
+  unnest(numb_red_paddle)
 ```
 
 ## Scene 4
